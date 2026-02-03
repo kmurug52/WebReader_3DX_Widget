@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Visualization Color Tool</title>
+    <!-- Load the 3DEXPERIENCE Framework -->
+    <script type="text/javascript" src="https://uwa.3ds.com/lib/UWA/js/UWA_Standalone_Alone.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 15px; background: #ffffff; }
+        .container { border: 1px solid #ddd; border-radius: 5px; padding: 10px; }
+        .btn { 
+            width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 3px; 
+            color: white; font-weight: bold; cursor: pointer; 
+        }
+        .red { background: #d9534f; }
+        .green { background: #5cb85c; }
+        .blue { background: #428bca; }
+        .status { font-size: 12px; color: #888; margin-top: 10px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h3>Visual Overrides</h3>
+        <p style="font-size: 13px;">Select a part in 3D, then pick a color:</p>
+        
+        <button id="btnRed" class="btn red">Apply Red</button>
+        <button id="btnGreen" class="btn green">Apply Green</button>
+        <button id="btnBlue" class="btn blue">Apply Blue</button>
+        
+        <div id="statusLabel" class="status">No part selected</div>
+    </div>
+
+    <script>
+        // Use PlatformAPI to communicate with other widgets
+        require(['DS/PlatformAPI/PlatformAPI'], function (PlatformAPI) {
+            let currentSelection = [];
+
+            // 1. Listen for when the user selects something in the 3D Viewer
+            PlatformAPI.subscribe('DS/Framework/Selection', function (data) {
+                if (data && data.paths) {
+                    currentSelection = data.paths;
+                    document.getElementById('statusLabel').innerText = "Selected items: " + currentSelection.length;
+                }
+            });
+
+            // 2. Send the color command to the 3D Viewer
+            function applyVisualColor(r, g, b) {
+                if (currentSelection.length === 0) {
+                    alert("Please select a part in the 3D view first.");
+                    return;
+                }
+
+                // This is the "Visualization Only" command
+                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', {
+                    nodes: currentSelection,
+                    overrides: {
+                        color: { r: r, g: g, b: b },
+                        opacity: 255
+                    }
+                });
+            }
+
+            // Bind buttons
+            document.getElementById('btnRed').onclick = () => applyVisualColor(255, 0, 0);
+            document.getElementById('btnGreen').onclick = () => applyVisualColor(0, 255, 0);
+            document.getElementById('btnBlue').onclick = () => applyVisualColor(0, 0, 255);
+        });
+    </script>
+</body>
+</html>
