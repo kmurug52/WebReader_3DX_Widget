@@ -3,103 +3,78 @@
 <head>
     <meta charset="utf-8" />
     <title>Visualization Color Tool</title>
-    <!-- Your local UWA file -->
     <script type="text/javascript" src="UWA.js"></script>
-    
     <script>
-        // CONFIGURATION: Tell the widget where the Ford libraries live
         require.config({
-            paths: {
-                'DS': 'https://3ddashboard.pdops.ds.ford.com/3ddashboard/resources/20250725T204009Z/en/webapps'
-            }
+            paths: { 'DS': 'https://3ddashboard.pdops.ds.ford.com/3ddashboard/resources/20250725T204009Z/en/webapps' }
         });
     </script>
-
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 15px; background: #ffffff; }
-        .container { border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: #fcfcfc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        h3 { margin-top: 0; color: #333; font-size: 18px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .btn { 
-            width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 4px; 
-            color: white; font-weight: bold; cursor: pointer; font-size: 14px;
-            transition: transform 0.1s, filter 0.2s;
-        }
-        .btn:active { transform: scale(0.98); }
-        .btn:hover { filter: brightness(90%); }
-        .red { background: #d9534f; }
-        .green { background: #5cb85c; }
-        .blue { background: #428bca; }
-        #statusLabel { 
-            font-size: 13px; margin-top: 15px; text-align: center; 
-            padding: 8px; border-radius: 4px; background: #eee; color: #555;
-        }
+        body { font-family: 'Segoe UI', sans-serif; padding: 15px; background: #ffffff; }
+        .container { border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: #fcfcfc; }
+        .btn { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; }
+        .red { background: #d9534f; } .green { background: #5cb85c; } .blue { background: #428bca; }
+        #statusLabel { font-size: 13px; margin-top: 15px; text-align: center; padding: 8px; border-radius: 4px; background: #eee; color: #555; }
     </style>
 </head>
 <body>
     <div class="container">
         <h3>Visual Overrides</h3>
-        <p style="font-size: 13px; color: #666;">1. Select a part in 3D<br>2. Click a color:</p>
-        
         <button id="btnRed" class="btn red">Apply Red</button>
         <button id="btnGreen" class="btn green">Apply Green</button>
         <button id="btnBlue" class="btn blue">Apply Blue</button>
-        
-        <div id="statusLabel">Connecting to 3DEXPERIENCE...</div>
+        <div id="statusLabel">Initializing...</div>
     </div>
 
     <script>
-        // Now that we pointed 'DS' to the Ford server, this will no longer 404
         require(['DS/PlatformAPI/PlatformAPI'], function (PlatformAPI) {
             let currentSelection = [];
             const status = document.getElementById('statusLabel');
-            
-            status.innerText = "Connected. Select a part.";
-            status.style.background = "#e8f5e9";
-            status.style.color = "#2e7d32";
+            status.innerText = "Listening for 3D Selection...";
 
-            // 1. Listen for selection events from 3DPlay
-            PlatformAPI.subscribe('DS/Framework/Selection', function (data) {
-                if (data && data.paths && data.paths.length > 0) {
-                    currentSelection = data.paths;
-                    status.innerText = "Part Selected (" + currentSelection.length + ")";
-                    status.style.background = "#e3f2fd";
-                    status.style.color = "#1565c0";
-                } else {
-                    currentSelection = [];
-                    status.innerText = "Selection Cleared";
-                    status.style.background = "#eee";
-                    status.style.color = "#555";
-                }
+            // THE FIX: Listen to all 3 common selection channels used by Ford/3DS
+            const channels = [
+                'DS/Framework/Selection',
+                'DS/3DPlay/Selection',
+                'DS/3DNavigation/Selection'
+            ];
+
+            channels.forEach(channel => {
+                PlatformAPI.subscribe(channel, function (data) {
+                    console.log("Received selection from: " + channel, data);
+                    
+                    // Extract nodes/paths from the selection data
+                    let nodes = data.paths || data.nodes || (data[0] ? data[0].paths : null);
+                    
+                    if (nodes && nodes.length > 0) {
+                        currentSelection = nodes;
+                        status.innerText = "SUCCESS: Part Found!";
+                        status.style.background = "#e3f2fd";
+                        status.style.color = "#1565c0";
+                    }
+                });
             });
 
-            // 2. Function to apply the color
-            function applyVisualColor(r, g, b) {
+            function applyColor(r, g, b) {
                 if (currentSelection.length === 0) {
-                    alert("Please select a part in the 3D view first.");
+                    alert("Widget doesn't see the selection yet. Please click the part again.");
                     return;
                 }
-
-                const colorPayload = {
+                
+                const payload = {
                     nodes: currentSelection,
-                    overrides: {
-                        color: { r: r, g: g, b: b },
-                        opacity: 255
-                    }
+                    overrides: { color: { r: r, g: g, b: b }, opacity: 255 }
                 };
 
-                // Send the command to 3DPlay
-                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', colorPayload);
+                // Send to both possible command channels
+                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', payload);
+                PlatformAPI.publish('DS/3DNavigation/setVisualOverrides', payload);
             }
 
-            // Bind buttons
-            document.getElementById('btnRed').onclick = () => applyVisualColor(255, 0, 0);
-            document.getElementById('btnGreen').onclick = () => applyVisualColor(0, 255, 0);
-            document.getElementById('btnBlue').onclick = () => applyVisualColor(0, 0, 255);
+            document.getElementById('btnRed').onclick = () => applyColor(255, 0, 0);
+            document.getElementById('btnGreen').onclick = () => applyColor(0, 255, 0);
+            document.getElementById('btnBlue').onclick = () => applyColor(0, 0, 255);
             
-        }, function(err) {
-            document.getElementById('statusLabel').innerText = "Connection Error. Check Console (F12).";
-            document.getElementById('statusLabel').style.color = "red";
-            console.error("RequireJS Error:", err);
         });
     </script>
 </body>
