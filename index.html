@@ -3,61 +3,83 @@
 <head>
     <meta charset="utf-8" />
     <title>Visualization Color Tool</title>
-    <!-- Pointing to the file you uploaded to GitHub -->
+    <!-- Your local UWA file -->
     <script type="text/javascript" src="UWA.js"></script>
+    
+    <script>
+        // CONFIGURATION: Tell the widget where the Ford libraries live
+        require.config({
+            paths: {
+                'DS': 'https://3ddashboard.pdops.ds.ford.com/3ddashboard/resources/20250725T204009Z/en/webapps'
+            }
+        });
+    </script>
+
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 15px; background: #ffffff; overflow: hidden; }
-        .container { border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f9f9f9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 15px; background: #ffffff; }
+        .container { border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: #fcfcfc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h3 { margin-top: 0; color: #333; font-size: 18px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .btn { 
-            width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 4px; 
-            color: white; font-weight: bold; cursor: pointer; transition: opacity 0.2s;
+            width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 4px; 
+            color: white; font-weight: bold; cursor: pointer; font-size: 14px;
+            transition: transform 0.1s, filter 0.2s;
         }
-        .btn:hover { opacity: 0.8; }
+        .btn:active { transform: scale(0.98); }
+        .btn:hover { filter: brightness(90%); }
         .red { background: #d9534f; }
         .green { background: #5cb85c; }
         .blue { background: #428bca; }
-        .status { font-size: 12px; font-weight: bold; margin-top: 10px; text-align: center; color: #666; }
+        #statusLabel { 
+            font-size: 13px; margin-top: 15px; text-align: center; 
+            padding: 8px; border-radius: 4px; background: #eee; color: #555;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h3 style="margin-top:0;">Visual Overrides</h3>
-        <p style="font-size: 13px;">1. Select a part in 3D<br>2. Click a color below:</p>
+        <h3>Visual Overrides</h3>
+        <p style="font-size: 13px; color: #666;">1. Select a part in 3D<br>2. Click a color:</p>
         
         <button id="btnRed" class="btn red">Apply Red</button>
         <button id="btnGreen" class="btn green">Apply Green</button>
         <button id="btnBlue" class="btn blue">Apply Blue</button>
         
-        <div id="statusLabel" class="status">Waiting for selection...</div>
+        <div id="statusLabel">Connecting to 3DEXPERIENCE...</div>
     </div>
 
     <script>
-        // Start the 3DEXPERIENCE Widget Logic
+        // Now that we pointed 'DS' to the Ford server, this will no longer 404
         require(['DS/PlatformAPI/PlatformAPI'], function (PlatformAPI) {
             let currentSelection = [];
             const status = document.getElementById('statusLabel');
+            
+            status.innerText = "Connected. Select a part.";
+            status.style.background = "#e8f5e9";
+            status.style.color = "#2e7d32";
 
-            // 1. Listen for selections from the 3D Navigate / 3DPlay widgets
+            // 1. Listen for selection events from 3DPlay
             PlatformAPI.subscribe('DS/Framework/Selection', function (data) {
                 if (data && data.paths && data.paths.length > 0) {
                     currentSelection = data.paths;
-                    status.innerText = "Selected items: " + currentSelection.length;
-                    status.style.color = "#5cb85c"; // Green for success
+                    status.innerText = "Part Selected (" + currentSelection.length + ")";
+                    status.style.background = "#e3f2fd";
+                    status.style.color = "#1565c0";
                 } else {
                     currentSelection = [];
-                    status.innerText = "Selection cleared";
-                    status.style.color = "#666";
+                    status.innerText = "Selection Cleared";
+                    status.style.background = "#eee";
+                    status.style.color = "#555";
                 }
             });
 
-            // 2. Function to send the color change command
+            // 2. Function to apply the color
             function applyVisualColor(r, g, b) {
                 if (currentSelection.length === 0) {
                     alert("Please select a part in the 3D view first.");
                     return;
                 }
 
-                const payload = {
+                const colorPayload = {
                     nodes: currentSelection,
                     overrides: {
                         color: { r: r, g: g, b: b },
@@ -65,17 +87,20 @@
                     }
                 };
 
-                // Publish to both common 3D channels to ensure it works
-                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', payload);
-                PlatformAPI.publish('DS/3DNavigation/setVisualOverrides', payload);
+                // Send the command to 3DPlay
+                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', colorPayload);
             }
 
-            // Bind buttons to the function
+            // Bind buttons
             document.getElementById('btnRed').onclick = () => applyVisualColor(255, 0, 0);
             document.getElementById('btnGreen').onclick = () => applyVisualColor(0, 255, 0);
             document.getElementById('btnBlue').onclick = () => applyVisualColor(0, 0, 255);
+            
+        }, function(err) {
+            document.getElementById('statusLabel').innerText = "Connection Error. Check Console (F12).";
+            document.getElementById('statusLabel').style.color = "red";
+            console.error("RequireJS Error:", err);
         });
     </script>
 </body>
 </html>
-
