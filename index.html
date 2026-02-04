@@ -3,6 +3,11 @@
 <head>
     <meta charset="utf-8" />
     <title>Visualization Color Tool</title>
+    
+    <!-- THESE TWO TAGS ARE THE FIX FOR THE "LINKING" ERROR -->
+    <meta name="com.ds.uwa.widget" content="true" />
+    <meta name="com.ds.uwa.linkable" content="true" />
+
     <script type="text/javascript" src="UWA.js"></script>
     <script>
         require.config({
@@ -32,43 +37,30 @@
             const status = document.getElementById('statusLabel');
             status.innerText = "Listening for 3D Selection...";
 
-            // THE FIX: Listen to all 3 common selection channels used by Ford/3DS
-            const channels = [
-                'DS/Framework/Selection',
-                'DS/3DPlay/Selection',
-                'DS/3DNavigation/Selection'
-            ];
-
-            channels.forEach(channel => {
-                PlatformAPI.subscribe(channel, function (data) {
-                    console.log("Received selection from: " + channel, data);
-                    
-                    // Extract nodes/paths from the selection data
-                    let nodes = data.paths || data.nodes || (data[0] ? data[0].paths : null);
-                    
-                    if (nodes && nodes.length > 0) {
+            // Listen to selection channels
+            const channels = ['DS/Framework/Selection', 'DS/3DPlay/Selection'];
+            
+            channels.forEach(ch => {
+                PlatformAPI.subscribe(ch, function (data) {
+                    let nodes = data.paths || data.nodes || (data[0] && data[0].paths);
+                    if (nodes) {
                         currentSelection = nodes;
-                        status.innerText = "SUCCESS: Part Found!";
-                        status.style.background = "#e3f2fd";
-                        status.style.color = "#1565c0";
+                        status.innerText = "PART FOUND (" + nodes.length + ")";
+                        status.style.background = "#ccffcc";
                     }
                 });
             });
 
             function applyColor(r, g, b) {
                 if (currentSelection.length === 0) {
-                    alert("Widget doesn't see the selection yet. Please click the part again.");
+                    alert("No part detected. Ensure widgets are LINKED.");
                     return;
                 }
-                
-                const payload = {
-                    nodes: currentSelection,
-                    overrides: { color: { r: r, g: g, b: b }, opacity: 255 }
+                const payload = { 
+                    nodes: currentSelection, 
+                    overrides: { color: { r: r, g: g, b: b }, opacity: 255 } 
                 };
-
-                // Send to both possible command channels
                 PlatformAPI.publish('DS/3DPlay/setVisualOverrides', payload);
-                PlatformAPI.publish('DS/3DNavigation/setVisualOverrides', payload);
             }
 
             document.getElementById('btnRed').onclick = () => applyColor(255, 0, 0);
