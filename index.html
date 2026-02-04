@@ -3,64 +3,74 @@
 <head>
     <meta charset="utf-8" />
     <title>Visualization Color Tool</title>
-    <!-- Load the 3DEXPERIENCE Framework -->
-    <script type="text/javascript" src="https://uwa.3ds.com/lib/UWA/js/UWA_Standalone_Alone.js"></script>
+    <!-- Pointing to the file you uploaded to GitHub -->
+    <script type="text/javascript" src="UWA.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 15px; background: #ffffff; }
-        .container { border: 1px solid #ddd; border-radius: 5px; padding: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 15px; background: #ffffff; overflow: hidden; }
+        .container { border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f9f9f9; }
         .btn { 
-            width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 3px; 
-            color: white; font-weight: bold; cursor: pointer; 
+            width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 4px; 
+            color: white; font-weight: bold; cursor: pointer; transition: opacity 0.2s;
         }
+        .btn:hover { opacity: 0.8; }
         .red { background: #d9534f; }
         .green { background: #5cb85c; }
         .blue { background: #428bca; }
-        .status { font-size: 12px; color: #888; margin-top: 10px; text-align: center; }
+        .status { font-size: 12px; font-weight: bold; margin-top: 10px; text-align: center; color: #666; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h3>Visual Overrides</h3>
-        <p style="font-size: 13px;">Select a part in 3D, then pick a color:</p>
+        <h3 style="margin-top:0;">Visual Overrides</h3>
+        <p style="font-size: 13px;">1. Select a part in 3D<br>2. Click a color below:</p>
         
         <button id="btnRed" class="btn red">Apply Red</button>
         <button id="btnGreen" class="btn green">Apply Green</button>
         <button id="btnBlue" class="btn blue">Apply Blue</button>
         
-        <div id="statusLabel" class="status">No part selected</div>
+        <div id="statusLabel" class="status">Waiting for selection...</div>
     </div>
 
     <script>
-        // Use PlatformAPI to communicate with other widgets
+        // Start the 3DEXPERIENCE Widget Logic
         require(['DS/PlatformAPI/PlatformAPI'], function (PlatformAPI) {
             let currentSelection = [];
+            const status = document.getElementById('statusLabel');
 
-            // 1. Listen for when the user selects something in the 3D Viewer
+            // 1. Listen for selections from the 3D Navigate / 3DPlay widgets
             PlatformAPI.subscribe('DS/Framework/Selection', function (data) {
-                if (data && data.paths) {
+                if (data && data.paths && data.paths.length > 0) {
                     currentSelection = data.paths;
-                    document.getElementById('statusLabel').innerText = "Selected items: " + currentSelection.length;
+                    status.innerText = "Selected items: " + currentSelection.length;
+                    status.style.color = "#5cb85c"; // Green for success
+                } else {
+                    currentSelection = [];
+                    status.innerText = "Selection cleared";
+                    status.style.color = "#666";
                 }
             });
 
-            // 2. Send the color command to the 3D Viewer
+            // 2. Function to send the color change command
             function applyVisualColor(r, g, b) {
                 if (currentSelection.length === 0) {
                     alert("Please select a part in the 3D view first.");
                     return;
                 }
 
-                // This is the "Visualization Only" command
-                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', {
+                const payload = {
                     nodes: currentSelection,
                     overrides: {
                         color: { r: r, g: g, b: b },
                         opacity: 255
                     }
-                });
+                };
+
+                // Publish to both common 3D channels to ensure it works
+                PlatformAPI.publish('DS/3DPlay/setVisualOverrides', payload);
+                PlatformAPI.publish('DS/3DNavigation/setVisualOverrides', payload);
             }
 
-            // Bind buttons
+            // Bind buttons to the function
             document.getElementById('btnRed').onclick = () => applyVisualColor(255, 0, 0);
             document.getElementById('btnGreen').onclick = () => applyVisualColor(0, 255, 0);
             document.getElementById('btnBlue').onclick = () => applyVisualColor(0, 0, 255);
